@@ -1,0 +1,5 @@
+name = "programmino"
+# Must not be newer than the runtime bundled with the installed wrangler,
+# or the local server refuses to start.
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "dist"

@@ -1,0 +1,8 @@
+node_modules
+dist
+.env.local
+tools/smoke-out
+.env
+.env.local
+.wrangler
+.dev.vars
