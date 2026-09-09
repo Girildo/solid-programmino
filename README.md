@@ -41,13 +41,17 @@ plain object and the engine is shared.
 - `tables`: which rankings come out, and which votes feed each one
 - `rules`: which checks run, and whether each one is an error or a warning
 
-`src/domain/formats/` holds the three formats. Only Click the CONTEST (four criteria, one photo
-each) is offered in the picker; Sonia Gallery (ranked preferences) and Campionato (three categories)
-are marked `hidden` because the group no longer runs them. The engine still reads them, so bringing
-one back means deleting one line.
+`src/domain/formats/` holds the three formats. The picker offers Click the CONTEST (four criteria,
+one photo each) and Sonia Gallery (ranked preferences); Campionato (three categories) is marked
+`hidden` because the group no longer runs it. The engine still reads it, so bringing it back means
+deleting one line.
 
 Adding a contest means adding one object there and listing it in `formats/index.ts`. No engine
 change, no new class.
+
+The picked format, the two ranking options and the preference count are kept in `localStorage`. The
+count is stored per format, because it belongs to the contest rather than to the session: switching
+format brings back the number that format was last run with, and never redefines the one you left.
 
 ## Pipeline
 
@@ -64,7 +68,14 @@ change, no new class.
 formats easy to poke at.
 
 Photos keep the thumbnail and photo-page URL found in the submission's markup, so the lists can
-show the picture on hover. A pasted thread carries no markup and simply has none.
+show the picture on hover, or centred on a tap where there is no pointer to hover with. A pasted
+thread carries no markup and simply has none.
+
+Two options ride on top of the tally instead of living in a format, because they are the
+organiser's call on the day rather than a property of the contest: dense ranking, which leaves no
+gap between ties, and leaving authors who did not vote out of the rankings. Both only touch the
+tables. The photo list, the counts and the "non ha votato" warnings still name everyone, so
+excluding somebody never hides that they took part.
 
 ## Sources
 
@@ -85,6 +96,9 @@ one, so a bad paste is visible instead of looking like a contest nobody entered.
 `src/sources/flickr.ts` calls `flickr.groups.discuss.replies.getList` directly from the browser.
 Verified working: the endpoint sends `access-control-allow-origin: *` and answers an unsigned
 request carrying only an API key.
+
+The reply list carries the topic itself, so the discussion's subject comes back with it and is
+shown above the results. A pasted thread has no subject and shows none.
 
 Two things about that call are easy to get wrong. It needs `group_id` as well as `topic_id`, and
 without it Flickr answers "Topic not found" rather than naming what is missing; the path alias out

@@ -1,7 +1,13 @@
 import { Show, createSignal } from "solid-js"
 import type { Photo } from "../domain/types"
 
-type Preview = { src: string; x: number; y: number }
+/**
+ * Where the preview sits: beside the row a pointer is hovering, or centred
+ * when a tap opened it, since a finger covers the row it came from.
+ */
+type Preview =
+  | { src: string; centred: true }
+  | { src: string; centred: false; x: number; y: number }
 
 /**
  * One floating preview at a time, shared by every list that shows photos.
@@ -12,20 +18,38 @@ type Preview = { src: string; x: number; y: number }
 const [preview, setPreview] = createSignal<Preview | null>(null)
 
 const MARGIN = 16
-const WIDTH = 240
+const WIDTH = 300
 
-export function photoHoverProps(photo: Photo) {
+function beside(target: HTMLElement, src: string): Preview {
+  const box = target.getBoundingClientRect()
+  const x = Math.min(box.right + MARGIN, window.innerWidth - WIDTH - MARGIN)
+  const y = Math.min(box.top, window.innerHeight - WIDTH - MARGIN)
+  return { src, centred: false, x: Math.max(MARGIN, x), y: Math.max(MARGIN, y) }
+}
+
+function placement(shown: Preview): Record<string, string> {
+  return shown.centred
+    ? { left: "50%", top: "50%" }
+    : { left: `${shown.x}px`, top: `${shown.y}px` }
+}
+
+export function photoPreviewProps(photo: Photo) {
   if (!photo.thumbnail) return {}
   const src = photo.thumbnail
   return {
-    onMouseEnter: (event: MouseEvent) => {
-      const target = event.currentTarget as HTMLElement
-      const box = target.getBoundingClientRect()
-      const x = Math.min(box.right + MARGIN, window.innerWidth - WIDTH - MARGIN)
-      const y = Math.min(box.top, window.innerHeight - WIDTH - MARGIN)
-      setPreview({ src, x: Math.max(MARGIN, x), y: Math.max(MARGIN, y) })
+    onPointerEnter: (event: PointerEvent) => {
+      if (event.pointerType === "mouse") {
+        setPreview(beside(event.currentTarget as HTMLElement, src))
+      }
     },
-    onMouseLeave: () => setPreview(null),
+    onPointerLeave: (event: PointerEvent) => {
+      if (event.pointerType === "mouse") setPreview(null)
+    },
+    // A tap leaves nothing hovering, so it opens a preview that stays until it
+    // is dismissed. Scrolling the list cancels the pointer and never gets here.
+    onPointerUp: (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") setPreview({ src, centred: true })
+    },
   }
 }
 
@@ -33,12 +57,19 @@ export function PhotoPreviewLayer() {
   return (
     <Show when={preview()}>
       {(shown) => (
-        <img
-          class="photo-preview"
-          src={shown().src}
-          alt=""
-          style={{ left: `${shown().x}px`, top: `${shown().y}px` }}
-        />
+        <>
+          {/* Dismisses the tapped preview, and stops the tap under it from
+              opening another one straight away. */}
+          <Show when={shown().centred}>
+            <div class="preview-backdrop" onPointerUp={() => setPreview(null)} />
+          </Show>
+          <img
+            classList={{ "photo-preview": true, centred: shown().centred }}
+            src={shown().src}
+            alt=""
+            style={placement(shown())}
+          />
+        </>
       )}
     </Show>
   )

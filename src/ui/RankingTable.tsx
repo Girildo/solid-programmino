@@ -3,7 +3,7 @@ import type { JSX } from "solid-js"
 import type { ContestFormat } from "../domain/format"
 import { categoriesOf } from "../domain/format"
 import type { Row, Table } from "../domain/types"
-import { photoHoverProps } from "./photoPreview"
+import { photoPreviewProps } from "./photoPreview"
 
 type Props = {
   table: Table
@@ -100,7 +100,7 @@ export function RankingTable(props: Props) {
                 </td>
                 <td
                   classList={{ "col-photo": true, hoverable: row.photo.thumbnail !== null }}
-                  {...photoHoverProps(row.photo)}
+                  {...photoPreviewProps(row.photo)}
                 >
                   #{row.photo.id}
                 </td>

@@ -10,7 +10,12 @@ for (const key of [
   "window", "document", "navigator", "HTMLElement", "Element", "Node", "Event",
   "CustomEvent", "MouseEvent", "SVGElement", "localStorage", "getComputedStyle",
 ]) {
-  globalThis[key] = key === "window" ? w : w[key]
+  // Node defines some of these globals itself, and navigator has no setter.
+  Object.defineProperty(globalThis, key, {
+    value: key === "window" ? w : w[key],
+    writable: true,
+    configurable: true,
+  })
 }
 globalThis.requestAnimationFrame = w.requestAnimationFrame.bind(w)
 
@@ -63,6 +68,34 @@ function clickHeader(label) {
     (node) => node.textContent.trim().replace(/[^A-Za-z#]/g, "") === label,
   )
   th.dispatchEvent(new w.MouseEvent("click", { bubbles: true }))
+}
+
+function toggle(label) {
+  const box = [...document.querySelectorAll("label.toggle")]
+    .find((node) => node.textContent.replace(/\s+/g, " ").includes(label))
+    .querySelector('input[type="checkbox"]')
+  box.checked = !box.checked
+  box.dispatchEvent(new w.Event("change", { bubbles: true }))
+}
+
+// jsdom has no PointerEvent, and pointerType is what the preview branches on.
+function pointer(node, type, pointerType) {
+  const event = new w.Event(type, { bubbles: true })
+  event.pointerType = pointerType
+  node.dispatchEvent(event)
+}
+
+function previewState() {
+  const shown = document.querySelector(".photo-preview")
+  if (!shown) return "nessuna"
+  return shown.classList.contains("centred") ? "al centro" : "di fianco"
+}
+
+function autoLabel(index) {
+  const row = [...document.querySelectorAll(".comments li")].find(
+    (li) => li.querySelector(".idx").textContent.trim() === String(index),
+  )
+  return row.querySelector('select.role option[value=""]').textContent.trim()
 }
 
 function setRole(index, role) {
@@ -153,6 +186,8 @@ await scenario("marcatore citato per sbaglio", {
   text: QUOTED_MARKER,
   preferences: 1,
 })
+// Comment 4 is the one the marker caught by mistake. Pinning it must not cost
+// the format's own answer, or there is nothing left to compare the pin against.
 await scenario("stesso thread, ruolo corretto a mano", {
   format: F,
   text: QUOTED_MARKER,
@@ -160,6 +195,9 @@ await scenario("stesso thread, ruolo corretto a mano", {
   fix: () => {
     click("Mostra")
     setRole(4, "ignored")
+  },
+  extra: () => {
+    console.log(`  commento 4 forzato a "Ignorato", ${autoLabel(4)}`)
   },
 })
 
@@ -176,6 +214,22 @@ const first = await scenario("submission con markup (miniature)", {
   extra: ({ thumbs, report }) => {
     console.log(`  miniature disponibili: ${thumbs}`)
     console.log(`  report inizia con: ${JSON.stringify(report.split(/\r?\n/)[0])}`)
+
+    const row = document.querySelector(".photos li.hoverable")
+    pointer(row, "pointerenter", "mouse")
+    const hovered = previewState()
+    pointer(row, "pointerleave", "mouse")
+    const left = previewState()
+
+    // A touch device never sends those, so the tap has to stand on its own.
+    pointer(row, "pointerup", "touch")
+    const tapped = previewState()
+    const backdrop = document.querySelector(".preview-backdrop")
+    pointer(backdrop, "pointerup", "touch")
+    const dismissed = previewState()
+
+    console.log(`  mouse: passaggio ${hovered}, uscita ${left}`)
+    console.log(`  tocco: tap ${tapped}, sfondo ${backdrop ? "presente" : "assente"}, chiusura ${dismissed}`)
   },
 })
 
@@ -220,6 +274,97 @@ await scenario("ordinamento per autore", {
   fix: () => clickHeader("Autore"),
 })
 
+// fotomie2009 posts #03 and never votes, so the photo that would lead the
+// table is exactly the one the option has to remove.
+await scenario("senza gli autori che non hanno votato", {
+  format: F,
+  text: CTC,
+  preferences: 1,
+  fix: () => toggle("Escludi dalle classifiche"),
+})
+
+await scenario("azzeramento della sorgente", {
+  format: F,
+  text: CTC,
+  preferences: 1,
+  fix: () => {
+    click("Flickr")
+    const field = document.querySelector('input.field[type="url"]')
+    field.value = "https://www.flickr.com/groups/clickthecontest/discuss/72157721925480241/"
+    field.dispatchEvent(new w.Event("input", { bubbles: true }))
+    click("Azzera")
+  },
+  extra: ({ rows }) => {
+    const field = document.querySelector('input.field[type="url"]')
+    console.log(`  campo link: ${JSON.stringify(field.value)}`)
+    console.log(`  righe rimaste: ${rows.length}`)
+  },
+})
+
+// Settings have to survive both a format round trip and a reload, and each
+// format keeps its own count: switching used to reset the one you came from.
+{
+  const setSlider = (value) => {
+    const slider = document.querySelector("input.slider")
+    slider.value = String(value)
+    slider.dispatchEvent(new w.Event("input", { bubbles: true }))
+  }
+  const count = () => document.querySelector("input.slider").value
+  const mount = () => render(() => App(), document.getElementById("root"))
+
+  document.getElementById("root").innerHTML = ""
+  w.localStorage.clear()
+  let dispose = mount()
+
+  click(F)
+  setSlider(4)
+  click("Sonia Gallery")
+  const onSg = count()
+  setSlider(7)
+  click(F)
+  const backOnCtc = count()
+  const saved = w.localStorage.getItem("programmino.prefs")
+  dispose()
+
+  // Same browser, next visit.
+  document.getElementById("root").innerHTML = ""
+  dispose = mount()
+  const afterReload = count()
+  click("Sonia Gallery")
+  const sgAfterReload = count()
+
+  console.log("\n### impostazioni ricordate")
+  console.log(`  Click the CONTEST a 4, poi Sonia Gallery parte da ${onSg}`)
+  console.log(`  tornando a Click the CONTEST: ${backOnCtc}`)
+  console.log(`  dopo il riavvio: ${afterReload}, Sonia Gallery: ${sgAfterReload}`)
+  console.log(`  in memoria: ${saved}`)
+
+  // The ranking options only exist once a thread is on screen.
+  const loadSample = async () => {
+    click(F)
+    click("Incolla")
+    const ta = document.querySelector("textarea.paste")
+    ta.value = CTC
+    ta.dispatchEvent(new w.Event("input", { bubbles: true }))
+    click("Analizza")
+    await new Promise((r) => setTimeout(r, 30))
+  }
+  const switches = () =>
+    [...document.querySelectorAll("label.toggle input")].map((box) => box.checked)
+
+  await loadSample()
+  toggle("classifica densa")
+  toggle("Escludi dalle classifiche")
+  const set = switches()
+  dispose()
+
+  document.getElementById("root").innerHTML = ""
+  dispose = mount()
+  await loadSample()
+  console.log(`  interruttori: ${set} prima, ${switches()} dopo il riavvio`)
+  dispose()
+}
+
 // The Flickr path with the network stubbed: checks the request Flickr actually
 // needs, and that submitting the form loads a thread. jsdom does not implement
 // implicit form submission, so the submit event stands in for the Enter key.
@@ -232,7 +377,8 @@ await scenario("ordinamento per autore", {
       json: async () => ({
         stat: "ok",
         replies: {
-          topic: { pages: 1, total: 6 },
+          // The subject arrives escaped, so it also proves entities are resolved.
+          topic: { subject: "Click the CONTEST 42 &ndash; luci &amp; ombre", pages: 1, total: 6 },
           reply: [
             { author: "1@N01", authorname: "nicoletta lindor", message: { _content: "Tema del contest" } },
             { author: "2@N01", authorname: "Alex Lawrence", message: { _content: "#01 Ottobre" } },
@@ -262,6 +408,9 @@ await scenario("ordinamento per autore", {
   const asked = (requested[0] ?? "").replace(/api_key=[^&]+/, "api_key=***")
   console.log("\n### invio nel campo Flickr (rete simulata)")
   console.log(`  richieste: ${requested.length}`)
+  // Its own row in the layout grid, so the two columns still start level.
+  const shown = document.querySelector(".layout > .thread-title")?.textContent ?? null
+  console.log(`  titolo mostrato: ${JSON.stringify(shown)}`)
   console.log(`  group_id inviato: ${/group_id=([^&]+)/.exec(asked)?.[1] ?? "MANCANTE"}`)
   console.log(`  topic_id inviato: ${/topic_id=([^&]+)/.exec(asked)?.[1] ?? "MANCANTE"}`)
   console.log(`  classifica: ${rows.join("  ") || "(vuota)"}`)

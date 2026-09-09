@@ -1,5 +1,5 @@
-import type { ContestFormat } from "../format"
-import { generatedOutput } from "./generated"
+import type { ContestFormat } from "../format";
+import { generatedOutput } from "./generated";
 
 const SAMPLE = `@Sonia Bianchi
 Benvenuti alla gara di questo mese! Postate le vostre foto qui sotto.
@@ -43,7 +43,7 @@ Si vota! Cinque preferenze in ordine, dalla migliore alla peggiore.
 ---
 @Sonia Bianchi
 Stop Voting
-Grazie a tutti, ci vediamo il mese prossimo.`
+Grazie a tutti, ci vediamo il mese prossimo.`;
 
 /**
  * One ordered run of ids per voter, best first. The first preference is worth
@@ -52,7 +52,7 @@ Grazie a tutti, ci vediamo il mese prossimo.`
 export const soniaGallery: ContestFormat = {
   id: "sg",
   label: "Sonia Gallery",
-  hidden: true,
+  hidden: false,
   blurb: "Voto a preferenze ordinate: #3#7#12",
 
   votingStarts: { linePattern: /^#{6,}$/, scope: "comment" },
@@ -84,6 +84,6 @@ export const soniaGallery: ContestFormat = {
     { id: "everyPhotoAtZero", severity: "error" },
   ],
 
-  defaultPreferences: 5,
+  defaultPreferences: 1,
   sample: SAMPLE,
-}
+};

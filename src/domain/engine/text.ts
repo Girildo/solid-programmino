@@ -7,6 +7,16 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: " ",
+  // Flickr escapes typographic punctuation, which reads as "&ndash;" in a title.
+  ndash: "\u2013",
+  mdash: "\u2014",
+  hellip: "\u2026",
+  lsquo: "\u2018",
+  rsquo: "\u2019",
+  ldquo: "\u201c",
+  rdquo: "\u201d",
+  laquo: "\u00ab",
+  raquo: "\u00bb",
 }
 
 function decodeEntities(input: string): string {

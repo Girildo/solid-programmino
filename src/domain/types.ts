@@ -31,7 +31,10 @@ export type Photo = {
 export type CommentRole = "submission" | "ballot" | "votingStart" | "ignored"
 
 export type ClassifiedComment = ThreadComment & {
+  /** The role the engine acted on: the override when there is one. */
   role: CommentRole
+  /** What the format made of this comment, whether or not a role was pinned. */
+  autoRole: CommentRole
   /** True when the role came from an override rather than from the format. */
   overridden: boolean
   /** Body with markup and entities resolved, ready for pattern matching. */

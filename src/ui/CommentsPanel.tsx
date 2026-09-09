@@ -81,7 +81,7 @@ export function CommentsPanel(props: Props) {
                     props.onOverride(comment.index, value === "" ? null : (value as CommentRole))
                   }}
                 >
-                  <option value="">auto: {ROLE_LABEL[comment.role]}</option>
+                  <option value="">auto: {ROLE_LABEL[comment.autoRole]}</option>
                   <For each={CHOICES}>
                     {(role) => <option value={role}>{ROLE_LABEL[role]}</option>}
                   </For>

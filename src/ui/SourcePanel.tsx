@@ -9,7 +9,8 @@ export type SourceMode = "paste" | "flickr"
 
 type Props = {
   format: ContestFormat
-  onLoaded: (comments: ThreadComment[]) => void
+  onLoaded: (comments: ThreadComment[], title: string | null) => void
+  onReset: () => void
 }
 
 type Detection = {
@@ -56,20 +57,20 @@ export function SourcePanel(props: Props) {
       total: comments.length,
       authors: comments.slice(0, 6).map((comment) => comment.author.name),
     })
-    props.onLoaded(comments)
+    props.onLoaded(comments, null)
   }
 
   const loadFlickr = async () => {
     setError(null)
     setBusy(true)
     try {
-      const comments = await fetchDiscussion(url())
+      const { title, comments } = await fetchDiscussion(url())
       setDetection({
         strategy: "json",
         total: comments.length,
         authors: comments.slice(0, 6).map((comment) => comment.author.name),
       })
-      props.onLoaded(comments)
+      props.onLoaded(comments, title)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -89,6 +90,17 @@ export function SourcePanel(props: Props) {
     loadPasted(props.format.sample)
   }
 
+  const canReset = () =>
+    url().length > 0 || pasted().length > 0 || detection() !== null || error() !== null
+
+  const reset = () => {
+    setUrl("")
+    setPasted("")
+    setDetection(null)
+    setError(null)
+    props.onReset()
+  }
+
   const looksWrong = () => {
     const found = detection()
     return found !== null && found.total <= 1 && pasted().split("\n").length > 3
@@ -98,13 +110,26 @@ export function SourcePanel(props: Props) {
     <section class="panel">
       <header class="panel-head">
         <h2>Sorgente</h2>
-        <div class="tabs">
-          <button classList={{ tab: true, on: mode() === "flickr" }} onClick={() => setMode("flickr")}>
-            Flickr
-          </button>
-          <button classList={{ tab: true, on: mode() === "paste" }} onClick={() => setMode("paste")}>
-            Incolla
-          </button>
+        <div class="row-inline">
+          <div class="tabs">
+            <button
+              classList={{ tab: true, on: mode() === "flickr" }}
+              onClick={() => setMode("flickr")}
+            >
+              Flickr
+            </button>
+            <button
+              classList={{ tab: true, on: mode() === "paste" }}
+              onClick={() => setMode("paste")}
+            >
+              Incolla
+            </button>
+          </div>
+          <Show when={canReset()}>
+            <button onClick={reset} disabled={busy()}>
+              Azzera
+            </button>
+          </Show>
         </div>
       </header>
 
